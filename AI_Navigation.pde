@@ -29,6 +29,7 @@ int numNodes  = 100;
 static int maxNumObstacles = 1000;
 Vec2 circlePos[] = new Vec2[maxNumObstacles]; //Circle positions
 float circleRad[] = new float[maxNumObstacles];  //Circle radii
+color circleColor[] = new color[maxNumObstacles];
 
 Vec2 startPos = new Vec2(100,500);
 Vec2 goalPos = new Vec2(500,200);
@@ -90,6 +91,8 @@ void placeRandomObstacles(int numObstacles){
   for (int i = 0; i < numObstacles; i++){
     circlePos[i] = new Vec2(random(50,950),random(50,700));
     circleRad[i] = (20+40*pow(random(1),3));
+    // color the obstacle
+    circleColor[i] = color(random(0,255), random(0,255), random(0,255));
   }
   circleRad[0] = 30; //Make the first obstacle big
 }
@@ -139,6 +142,7 @@ void setup(){
 
 Vec2 computeAgentVel(){
   Vec2 vel = path[curPathIdx].minus(agentPos);
+  
   if (curPathIdx > pathLen-1) {  // if we ever get larger than path length
     return new Vec2(0,0);
   }
@@ -157,24 +161,28 @@ Vec2 computeAgentVel(){
     
     // if the agent is close to the node, set the current path Id to the next one
     if(vel.length() < agentRad) {
-        curPathIdx++;
-        vel = path[curPathIdx].minus(agentPos);
+        vel = path[curPathIdx+1].minus(agentPos);
         vel.setToLength(goalSpeed);
+        curPathIdx++;
         return vel;
     }
-    // check if next node is visible
-    Vec2 a_dir = path[curPathIdx+1].minus(agentPos);
-    Vec2 check = a_dir.normalized();
-    hitInfo circleListCheck = rayCircleListIntersect(circlePos, circleRad, numObstacles, agentPos, check, a_dir.length());
-    // if not, advance curPathIdx and recalculate velocity
-    if(!circleListCheck.hit) {
-      curPathIdx = curPathIdx++;  // set path Id to the next Id
-      vel.setToLength(goalSpeed);
-      return vel;
+    for (int i=0; i < pathLen -1; i++) {
+      if (i > curPathIdx){
+        // check if next node is visible
+        Vec2 a_dir = path[i].minus(agentPos);
+        Vec2 check = a_dir.normalized();
+        hitInfo circleListCheck = rayCircleListIntersect(circlePos, circleRad, numObstacles, agentPos, check, a_dir.length());
+        // if not, advance curPathIdx and recalculate velocity
+        if(!circleListCheck.hit) {
+          curPathIdx = i;  // set path Id to the next Id
+          a_dir.setToLength(goalSpeed);
+          return a_dir;
+        }
+      }
     }
-    vel.setToLength(goalSpeed);
-    return vel;
   }
+  vel.setToLength(goalSpeed);
+  return vel;
 }
 
 void moveAgent(float dt){
@@ -190,6 +198,7 @@ void drawPRM() {
     pushMatrix();
     noStroke();
     translate(c.x,c.y);
+    fill(circleColor[i]);
     sphere(r);
     popMatrix();
   }
@@ -270,10 +279,7 @@ void keyPressed(){
     agentPos = new Vec2 (nodePos[startNode].x, nodePos[startNode].y);
     paused = true;
   }
-  else{
-    camera.HandleKeyPressed();
-  }
-
+  camera.HandleKeyPressed();
   connectNeighbors(circlePos, circleRad, numObstacles, nodePos, numNodes + 2);
   curPath = planPath(startPos, goalPos, circlePos, circleRad, numObstacles, nodePos, numNodes + 2);
 }
@@ -291,6 +297,7 @@ void mousePressed(){
   Vec2 mousePos = new Vec2(mouseX, mouseY);
   if (mousePos.distanceTo(agentPos) < agentRad){
     selected = true;
+    paused = true;
   }
   else if (paused) {
     selected = false;
@@ -315,6 +322,7 @@ void mouseDragged(){
 
 // reset bools 
 void mouseReleased(){
+  camera.HandleKeyReleased();
   selected = false;
   dragObs = false;
   exactPointer = false;
